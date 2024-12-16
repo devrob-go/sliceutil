@@ -11,87 +11,72 @@ var structCache = struct {
 	cache map[string]bool
 }{cache: make(map[string]bool)}
 
-// CompareStructs compares two structs deeply, with memoization to avoid redundant comparisons
+// CompareStructs compares two structs deeply, supporting nested structs and pointers.
 func CompareStructs(a, b interface{}) bool {
-	// Check if both are nil or have different types early on.
-	if a == nil || b == nil {
-		return a == b
+	// If both are nil, they are equal.
+	if a == nil && b == nil {
+		return true
 	}
 
-	// If the types are different, they cannot be equal.
+	// If one is nil, they are not equal.
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Check if the types are the same.
 	if reflect.TypeOf(a) != reflect.TypeOf(b) {
 		return false
 	}
 
-	// Generate a key for caching based on the struct's type and data
-	cacheKey := generateCacheKey(a, b)
-	structCache.RLock()
-	if cachedResult, found := structCache.cache[cacheKey]; found {
-		structCache.RUnlock()
-		return cachedResult
-	}
-	structCache.RUnlock()
-
-	// Use reflection to inspect the struct fields
+	// Use reflection to inspect the struct fields.
 	valA := reflect.ValueOf(a)
 	valB := reflect.ValueOf(b)
 
-	// Ensure that we can compare field values
+	// Dereference pointers, if applicable.
 	if valA.Kind() == reflect.Ptr {
+		if valA.IsNil() || valB.IsNil() {
+			return valA.IsNil() && valB.IsNil()
+		}
 		valA = valA.Elem()
-	}
-	if valB.Kind() == reflect.Ptr {
 		valB = valB.Elem()
 	}
 
-	// Iterate over each field of the struct and compare the values
+	// Check if both are structs.
+	if valA.Kind() != reflect.Struct || valB.Kind() != reflect.Struct {
+		return reflect.DeepEqual(a, b)
+	}
+
+	// Compare each field of the structs.
 	for i := 0; i < valA.NumField(); i++ {
 		fieldA := valA.Field(i)
 		fieldB := valB.Field(i)
 
-		// Skip unexported fields (i.e., those with lowercase starting letters)
-		if fieldA.CanInterface() && fieldB.CanInterface() {
-			if fieldA.Kind() == reflect.Struct {
-				// Recursively compare struct fields
-				if !CompareStructs(fieldA.Interface(), fieldB.Interface()) {
-					cacheComparisonResult(cacheKey, false)
-					return false
-				}
-			} else if fieldA.Kind() == reflect.Slice && fieldB.Kind() == reflect.Slice {
-				// If both fields are slices, compare them using CompareSlices
-				// Assert the types of the slices before passing them to CompareSlices
-				switch fieldA.Type().Elem().Kind() {
-				case reflect.Int:
-					// Assert slices as []int
-					aSlice := fieldA.Interface().([]int)
-					bSlice := fieldB.Interface().([]int)
-					if !CompareSlices(aSlice, bSlice) {
-						cacheComparisonResult(cacheKey, false)
-						return false
-					}
-				case reflect.String:
-					// Assert slices as []string
-					aSlice := fieldA.Interface().([]string)
-					bSlice := fieldB.Interface().([]string)
-					if !CompareSlices(aSlice, bSlice) {
-						cacheComparisonResult(cacheKey, false)
-						return false
-					}
-				default:
-					// Return false if the slice types are not supported
-					cacheComparisonResult(cacheKey, false)
-					return false
-				}
-			} else if fieldA.Interface() != fieldB.Interface() {
-				// If the field values differ, return false
-				cacheComparisonResult(cacheKey, false)
-				return false
-			}
+		// Skip unexported fields.
+		if !fieldA.CanInterface() || !fieldB.CanInterface() {
+			continue
+		}
+
+		// Compare fields recursively.
+		if !CompareStructs(fieldA.Interface(), fieldB.Interface()) {
+			return false
 		}
 	}
 
-	// Cache and return the result if structs match
-	cacheComparisonResult(cacheKey, true)
+	// If all fields match, return true.
+	return true
+}
+
+// Helper: Compare slices using reflection.
+func compareSlicesReflect(a, b reflect.Value) bool {
+	if a.Len() != b.Len() {
+		return false
+	}
+
+	for i := 0; i < a.Len(); i++ {
+		if !reflect.DeepEqual(a.Index(i).Interface(), b.Index(i).Interface()) {
+			return false
+		}
+	}
 	return true
 }
 

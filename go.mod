@@ -1,4 +1,4 @@
-module practice/sliceutil
+module github.com/devrob-go/sliceutil
 
 go 1.22.0
 

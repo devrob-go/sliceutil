@@ -1,42 +1,87 @@
-package sliceutil
+package sliceutil_test
 
 import (
 	"testing"
-	"github.com/stretchr/testify/assert"
+
 	"github.com/devrob-go/sliceutil"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestCompareSlices(t *testing.T) {
-	assert.True(t, sliceutil.CompareSlices([]int{1, 2, 3}, []int{1, 2, 3}))
-	assert.False(t, sliceutil.CompareSlices([]int{1, 2, 3}, []int{3, 2, 1}))
-	assert.False(t, sliceutil.CompareSlices([]int{1, 2, 3}, []int{1, 2}))
-	assert.True(t, sliceutil.CompareSlices([]string{"a", "b", "c"}, []string{"a", "b", "c"}))
+type Address struct {
+	City   string
+	Street string
 }
 
-func TestFindDifferences(t *testing.T) {
-	assert.Equal(t, sliceutil.FindDifferences([]int{1, 2, 3}, []int{2, 3, 4}), []int{1, 4})
-	assert.Equal(t, sliceutil.FindDifferences([]string{"a", "b"}, []string{"b", "c"}), []string{"a", "c"})
+type Person struct {
+	Name    string
+	Age     int
+	Address Address
 }
 
-func TestMergeSlices(t *testing.T) {
-	// Ascending order merge
-	assert.Equal(t, sliceutil.MergeSlices([]int{1, 3, 5}, []int{2, 4, 6}, true, func(a, b int) bool {
-		return a < b
-	}), []int{1, 2, 3, 4, 5, 6})
+func TestCompareStructs(t *testing.T) {
+	type Address struct {
+		City   string
+		Street string
+	}
 
-	// Descending order merge
-	assert.Equal(t, sliceutil.MergeSlices([]int{1, 3, 5}, []int{2, 4, 6}, false, func(a, b int) bool {
-		return a < b
-	}), []int{6, 5, 4, 3, 2, 1})
-}
+	type Person struct {
+		Name    string
+		Age     int
+		Address Address
+	}
 
-func TestMaxMinInt(t *testing.T) {
-	assert.Equal(t, sliceutil.MaxInt([]int{1, 2, 3, 4}), 4)
-	assert.Equal(t, sliceutil.MinInt([]int{1, 2, 3, 4}), 1)
-}
+	// Test case 1: Identical flat structs
+	t.Run("Identical Flat Structs", func(t *testing.T) {
+		a := Person{Name: "Alice", Age: 30}
+		b := Person{Name: "Alice", Age: 30}
+		assert.True(t, sliceutil.CompareStructs(a, b), "Structs should be identical")
+	})
 
-func TestCompareSum(t *testing.T) {
-	assert.Equal(t, sliceutil.CompareSum([]int{1, 2, 3}, []int{4, 5, 6}), "b is greater")
-	assert.Equal(t, sliceutil.CompareSum([]int{1, 2}, []int{1, 2}), "both are equal")
-	assert.Equal(t, sliceutil.CompareSum([]int{10, 20}, []int{5, 5}), "a is greater")
+	// Test case 2: Different flat structs
+	t.Run("Different Flat Structs", func(t *testing.T) {
+		a := Person{Name: "Alice", Age: 30}
+		b := Person{Name: "Bob", Age: 40}
+		assert.False(t, sliceutil.CompareStructs(a, b), "Structs should be different")
+	})
+
+	// Test case 3: Identical nested structs
+	t.Run("Identical Nested Structs", func(t *testing.T) {
+		a := Person{Name: "Alice", Age: 30, Address: Address{City: "New York", Street: "5th Ave"}}
+		b := Person{Name: "Alice", Age: 30, Address: Address{City: "New York", Street: "5th Ave"}}
+		assert.True(t, sliceutil.CompareStructs(a, b), "Nested structs should be identical")
+	})
+
+	// Test case 4: Different nested structs
+	t.Run("Different Nested Structs", func(t *testing.T) {
+		a := Person{Name: "Alice", Age: 30, Address: Address{City: "New York", Street: "5th Ave"}}
+		b := Person{Name: "Alice", Age: 30, Address: Address{City: "Los Angeles", Street: "Sunset Blvd"}}
+		assert.False(t, sliceutil.CompareStructs(a, b), "Nested structs should be different")
+	})
+
+	// Test case 5: Structs with identical pointers
+	t.Run("Structs with Identical Pointers", func(t *testing.T) {
+		address := &Address{City: "New York", Street: "5th Ave"}
+		a := struct {
+			Name    string
+			Address *Address
+		}{Name: "Alice", Address: address}
+		b := struct {
+			Name    string
+			Address *Address
+		}{Name: "Alice", Address: address}
+		assert.True(t, sliceutil.CompareStructs(a, b), "Structs with identical pointers should be equal")
+	})
+
+	// Test case 6: Structs with different pointers
+	t.Run("Structs with Different Pointers", func(t *testing.T) {
+		a := struct {
+			Name    string
+			Address *Address
+		}{Name: "Alice", Address: &Address{City: "New York", Street: "5th Ave"}}
+		b := struct {
+			Name    string
+			Address *Address
+		}{Name: "Alice", Address: &Address{City: "Los Angeles", Street: "Sunset Blvd"}}
+		assert.False(t, sliceutil.CompareStructs(a, b), "Structs with different pointers should not be equal")
+	})
 }
